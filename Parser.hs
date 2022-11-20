@@ -12,6 +12,9 @@ newtype Parser a = P (String -> Result String (a, String))
 parse :: Parser a -> String -> Result String (a, String)
 parse (P f) = f
 
+class Parseable a where
+    tryparse :: Parser a
+
 instance Monad Parser where
     p >>= f =
         let
@@ -106,7 +109,7 @@ exact str = exact' str str
             a <- char
             if a == c then exact' cs m
             else
-                fail ("Could not parse the exact string " ++ m)
+                fail ("could not parse the exact string " ++ m)
 
 
 token :: String -> Parser ()
@@ -117,4 +120,43 @@ token str = do
         whitespace
         return ()
     <|>
-        fail ("Could not pase the token " ++ str)
+        fail ("Could not parse the token " ++ str)
+
+
+instance Parseable Int where
+    tryparse = do
+        n <- while (`elem` "0123456789")
+        if null n
+           then fail "could not parse an integer"
+           else return (read n)
+
+
+instance Parseable Integer where
+    tryparse = do
+        n <- while (`elem` "0123456789")
+        if null n
+           then fail "could not parse an integer"
+           else return (read n)
+
+
+list :: Parseable a => Parser [a]
+list = do
+    do
+        x <- tryparse
+        token ","
+        xs <- list
+        if null xs
+           then fail "Could not parse list, unexpected commad after last element"
+           else return (x:xs)
+    <|> (do 
+        x <- tryparse
+        return [x]
+    <|> return [])
+
+
+instance (Parseable a) => Parseable [a] where
+    tryparse = do
+        token "["
+        xs <- list
+        token "]"
+        return xs
